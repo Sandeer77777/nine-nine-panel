@@ -164,7 +164,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateOperacao = useCallback(async (id: number, newData: any) => {
     try {
-      const payload = toDbOperacao(newData);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
+
+      const payload = { 
+        ...toDbOperacao(newData),
+        user_id: user.id 
+      };
+      
       const { error } = await supabase.from('operacoes').update(payload).eq('id', id);
       if (error) throw error;
       fetchData();
@@ -173,7 +180,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const addOperacao = useCallback(async (op: any) => {
     try {
-      const payload = toDbOperacao(op);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
+
+      const payload = { 
+        ...toDbOperacao(op),
+        user_id: user.id 
+      };
+
       const { error } = await supabase.from('operacoes').insert(payload);
       if (error) throw error;
       toast.success("Criado!");
@@ -192,9 +206,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const duplicateOperation = useCallback(async (op: any) => {
     try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error("Usuário não autenticado");
+
         const { id, created_at, ...payload } = op;
-        const dbPayload = toDbOperacao(payload);
-        dbPayload.nome = `${op.nome} (Cópia)`;
+        const dbPayload = {
+            ...toDbOperacao(payload),
+            nome: `${op.nome} (Cópia)`,
+            user_id: user.id
+        };
+        
         const { error } = await supabase.from('operacoes').insert(dbPayload);
         if (error) throw error;
         toast.success("Duplicada!");

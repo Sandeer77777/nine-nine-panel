@@ -102,7 +102,7 @@ export const OperacaoCard: React.FC<OperacaoCardProps> = ({
                   <div key={idx} className="bg-black/40 border border-white/5 p-3 rounded-xl space-y-2 group/fase transition-all hover:bg-black/60 relative flex flex-col justify-between">
                     <div className="flex justify-between items-center pb-1.5 border-b border-white/5">
                         <span className="text-[8px] font-black text-white uppercase italic">{fase.nome === 'FREEBET' ? 'Free bet' : (fase.nome || `Fase #${idx+1}`)}</span>
-                        <button onClick={() => onEditFase?.(operacao.id, fase, idx)} className="p-1 rounded bg-white/5 text-zinc-500 hover:text-white opacity-0 group-hover:fase:opacity-100 transition-all"><SquarePen size={10}/></button>
+                        <button onClick={() => onEditFase?.(operacao.id, fase, idx)} className="p-1 rounded bg-white/5 text-zinc-500 hover:text-white transition-all"><SquarePen size={10}/></button>
                     </div>
                     <div className="space-y-1 py-1">
                         {(fase.entradas || []).map((ent: any, i: number) => (
