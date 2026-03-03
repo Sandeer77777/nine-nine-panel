@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useData, supabase } from '../services/useData';
 import { toast } from 'react-hot-toast';
-import { Database, Download, ShieldAlert, Upload, RefreshCw, Sun, Moon, Target, Wallet, Settings2 } from 'lucide-react';
+import { Database, Download, ShieldAlert, Upload, RefreshCw, Sun, Moon, Target, Wallet, Settings2, Plus, Trash2, Eye, EyeOff, Building2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 const Configuracoes: React.FC = () => {
-  const { bancaInicial, configuracoes, updateBanca, fullReload } = useData();
+  const { bancaInicial, configuracoes, updateBanca, fullReload, casasApostas, addCasaAposta, deleteCasaAposta, toggleCasaVisibilidade } = useData();
   const [restoring, setRestoring] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [metaInput, setMetaInput] = useState('');
+  const [novaCasaInput, setNovaCasaInput] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -24,6 +25,15 @@ const Configuracoes: React.FC = () => {
       toast.success('Meta atualizada!');
       fullReload();
     } catch (error) { toast.error('Erro ao salvar meta'); }
+  };
+
+  const handleAddCasa = async () => {
+    if (!novaCasaInput.trim()) return;
+    try {
+      await addCasaAposta({ nome: novaCasaInput.trim(), status: 'Ativo' });
+      setNovaCasaInput('');
+      toast.success('Casa adicionada!');
+    } catch (e) { toast.error('Erro ao adicionar'); }
   };
 
   const toggleTheme = () => {
@@ -115,6 +125,91 @@ const Configuracoes: React.FC = () => {
               <div className="h-full flex items-center justify-center px-4 bg-white/5 text-zinc-600 rounded-lg text-[8px] font-black uppercase border border-white/5">Auto-Sync</div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* ARSENAL DE CASAS */}
+      <section className="glass-panel p-4 rounded-xl border border-white/5 space-y-4 shadow-2xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-white/5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-400"><Building2 size={16} /></div>
+            <div>
+              <h2 className="text-[10px] font-black text-white uppercase tracking-widest leading-none">Arsenal de Casas</h2>
+              <p className="text-[7px] text-zinc-600 font-black uppercase mt-1">Gestão de Plataformas Operacionais</p>
+            </div>
+          </div>
+          <div className="flex gap-2 h-9">
+            <input 
+              type="text" 
+              value={novaCasaInput} 
+              onChange={e => setNovaCasaInput(e.target.value)} 
+              placeholder="NOME DA CASA..." 
+              className="flex-1 bg-black border border-white/5 rounded-lg px-3 text-[9px] text-white outline-none focus:border-emerald-500/50 font-black uppercase w-32 sm:w-48"
+            />
+            <button onClick={handleAddCasa} className="px-4 bg-emerald-500 text-black rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-emerald-400 transition-all flex items-center gap-2">
+              <Plus size={12} strokeWidth={4} /> Add
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+          {(() => {
+            const ocultasRaw = configuracoes?.find(c => c.chave === 'casas_ocultas')?.valor || '';
+            const setOcultas = new Set(ocultasRaw.split(',').map((n: string) => n.trim().toLowerCase()));
+            
+            // Juntando as casas visíveis com as ocultas para gerenciar aqui
+            const todas = [...casasApostas];
+            const nomesAtuais = new Set(todas.map(c => c.nome.toLowerCase()));
+            
+            // Adiciona as que estão ocultas mas não estão na lista filtrada do useData
+            const padraoOcultas = [
+              "Bet365", "Bet7k", "Betano", "Betbra", "Betesporte", "Betnacional", 
+              "Betpix365", "Br4bet", "Esportivabet", "Estrelabet", "Jogodeouro", "Kto", 
+              "Lotogreen", "Mcgames", "Novibet", "Pixbet", "Sportingbet", "Sporty", "Stake", 
+              "Superbet", "Tradeball", "Vaidebet", "Vivasorte"
+            ].filter(nome => !nomesAtuais.has(nome.toLowerCase()) && setOcultas.has(nome.toLowerCase()))
+             .map((nome, i) => ({ id: -(i + 1000), nome, isHidden: true }));
+
+            return [...todas.map(c => ({ ...c, isHidden: false })), ...padraoOcultas]
+              .sort((a, b) => a.nome.localeCompare(b.nome))
+              .map((casa) => {
+                const isPadrao = casa.id < 0;
+                const isHidden = setOcultas.has(casa.nome.toLowerCase());
+                
+                return (
+                  <div key={casa.id} className={cn(
+                    "flex items-center justify-between p-2 bg-black/40 border border-white/5 rounded-lg group transition-all",
+                    isHidden ? "opacity-40 grayscale border-transparent" : "hover:border-white/10"
+                  )}>
+                    <span className={cn(
+                      "text-[9px] font-bold uppercase truncate pr-2",
+                      isHidden ? "text-zinc-600" : "text-zinc-300"
+                    )}>{casa.nome}</span>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={() => toggleCasaVisibilidade(casa.nome)} 
+                        title={isHidden ? "Mostrar Casa" : "Ocultar Casa"}
+                        className={cn(
+                          "p-1 transition-colors",
+                          isHidden ? "text-emerald-500 hover:text-emerald-400" : "text-zinc-600 hover:text-amber-500"
+                        )}
+                      >
+                        {isHidden ? <Eye size={10} /> : <EyeOff size={10} />}
+                      </button>
+                      {!isPadrao && (
+                        <button 
+                          onClick={() => deleteCasaAposta(casa.id)} 
+                          title="Excluir Definitivamente"
+                          className="p-1 text-zinc-600 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 size={10} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              });
+          })()}
         </div>
       </section>
 

@@ -33,11 +33,11 @@ const CardEntrada = ({ entrada, index, onUpdate, onRemove, casasDisponiveis }: {
     casasDisponiveis: any[];
 }) => {
     const [showAdvanced, setShowAdvanced] = useState(false);
-    const inputClass = "w-full h-8 sm:h-9 bg-[#0f172a] border border-slate-700/60 rounded-lg px-1.5 sm:px-2 text-[10px] sm:text-sm text-white focus:ring-1 focus:ring-cyan-500/50 outline-none placeholder-slate-600 transition-all font-medium";
-    const labelTextClass = "text-[7px] sm:text-[9px] font-black text-slate-600 uppercase tracking-tight sm:tracking-widest ml-1";
+    const inputClass = "w-full h-8 sm:h-9 bg-zinc-900/60 border border-zinc-800/80 rounded-lg px-1.5 sm:px-2 text-[10px] sm:text-sm text-zinc-50 focus:ring-1 focus:ring-emerald-500/40 outline-none placeholder-zinc-700 transition-all font-bold antialiased tracking-tight shadow-sm [text-rendering:optimizeLegibility]";
+    const labelTextClass = "text-[7px] sm:text-[8px] font-black text-zinc-500 uppercase tracking-[0.2em] ml-1 antialiased select-none";
     
-    // RESTAURANDO BRILHOS E CORES ORIGINAIS (SLATE/CYAN)
-    let borderClass = 'border-slate-800';
+    // RESTAURANDO BRILHOS E CORES ORIGINAIS (ZINC/EMERALD)
+    let borderClass = 'border-zinc-800/40';
     if (entrada.isLocked) borderClass = 'border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.15)]';
     else if (entrada.isLay) borderClass = 'border-red-500/60 shadow-[0_0_15px_rgba(239,68,68,0.15)]';
     else if (entrada.isPromo) borderClass = 'border-yellow-500/60 shadow-[0_0_15px_rgba(234,179,8,0.15)]';
@@ -474,12 +474,12 @@ export const AddFaseModal: React.FC<AddFaseModalProps> = ({ isOpen = true, onClo
           <div className="mt-3 sm:mt-4 bg-[#0E0E10] p-2 sm:p-4 rounded-xl sm:rounded-[1.5rem] border border-zinc-900 shadow-2xl">
             <div className="overflow-x-auto custom-scrollbar rounded-lg border border-zinc-800 bg-black/40">
               <table className="w-full text-left text-[6px] sm:text-[9px] border-collapse min-w-[500px] sm:min-w-full">
-                <thead className="bg-black/80 border-b border-zinc-900 text-[7px] sm:text-[10px] font-black text-zinc-500 uppercase tracking-tight sm:tracking-widest">
+                <thead className="bg-black/80 border-b border-zinc-900 text-[7px] sm:text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em] antialiased">
                   <tr>
                     <th className="px-2 py-1 sm:px-6 sm:py-3 text-left">Cenário</th>
                     <th className="px-1 py-1 sm:px-3 sm:py-3 text-center">Odd</th>
                     <th className="px-1 py-1 sm:px-3 sm:py-3 text-center">Stake</th>
-                    <th className="px-1 py-1 sm:px-3 sm:py-3 text-center text-red-500/70">Déficit</th>
+                    {temDeficit && <th className="px-1 py-1 sm:px-3 sm:py-3 text-center text-red-500/70">Déficit</th>}
                     <th className="px-2 py-1 sm:px-6 sm:py-3 text-right text-emerald-500/70">Lucro</th>
                   </tr>
                 </thead>
@@ -489,33 +489,33 @@ export const AddFaseModal: React.FC<AddFaseModalProps> = ({ isOpen = true, onClo
                     const deficit = cashReturn - totalInv;
                     const lucroCen = lucros[index];
                     
-                    return (<tr key={index} className="hover:bg-white/[0.02] transition-colors">
+                    return (<tr key={index} className="hover:bg-white/[0.02] transition-colors group/row">
                       <td className="px-2 py-1 sm:px-6 sm:py-3">
                         <div className="flex flex-col">
-                          <span className="text-[10px] sm:text-sm font-black text-white uppercase italic leading-tight">{item.casa || `Casa ${index + 1}`}</span>
+                          <span className="text-[10px] sm:text-[13px] font-extrabold text-zinc-100 uppercase italic leading-tight antialiased tracking-tight group-hover/row:text-white transition-colors">{item.casa || `Casa ${index + 1}`}</span>
                           <div className="flex flex-wrap gap-1 mt-1">
-                            {item.isPromo && <span className="text-[5px] sm:text-[7px] px-1 py-0.5 rounded-sm font-black uppercase border bg-emerald-500/10 text-emerald-400 border-emerald-500/20">Freebet</span>}
-                            {item.isRainbow && <span className="text-[5px] sm:text-[7px] px-1 py-0.5 rounded-sm font-black uppercase border bg-purple-500/10 text-purple-400 border-purple-500/20 text-nowrap">Reemb R${item.valorReembolso}</span>}
-                            {item.isLay && <span className="text-[5px] sm:text-[7px] px-1 py-0.5 rounded-sm font-black uppercase border bg-red-500/10 text-red-400 border-red-500/20">Lay</span>}
+                            {item.isPromo && <span className="text-[5px] sm:text-[7px] px-1 py-0.5 rounded-sm font-black uppercase border bg-emerald-500/10 text-emerald-400 border-emerald-500/20 antialiased">Freebet</span>}
+                            {item.isRainbow && <span className="text-[5px] sm:text-[7px] px-1 py-0.5 rounded-sm font-black uppercase border bg-purple-500/10 text-purple-400 border-purple-500/20 text-nowrap antialiased">Reemb R${item.valorReembolso}</span>}
+                            {item.isLay && <span className="text-[5px] sm:text-[7px] px-1 py-0.5 rounded-sm font-black uppercase border bg-red-500/10 text-red-400 border-red-500/20 antialiased">Lay</span>}
                           </div>
                         </div>
                       </td>
-                      <td className="px-1 py-1 sm:px-3 sm:py-3 text-center font-mono text-[10px] sm:text-sm text-zinc-500 leading-none">
+                      <td className="px-1 py-1 sm:px-3 sm:py-3 text-center font-mono text-[10px] sm:text-[13px] text-zinc-400 leading-none antialiased tracking-tighter [text-rendering:optimizeLegibility]">
                         <div className="flex flex-col items-center">
-                          <span>{item.oddFinalDisplay}</span>
+                          <span className="font-extrabold">{item.oddFinalDisplay}</span>
                           {item.odd !== item.oddFinalDisplay && item.oddFinalDisplay !== '-' && (
                             <span className="text-[6px] sm:text-[8px] text-zinc-700 line-through decoration-red-500/50">{item.odd}</span>
                           )}
                         </div>
                       </td>
-                      <td className="px-1 py-1 sm:px-3 sm:py-3 text-center font-mono text-[10px] sm:text-sm text-zinc-300 leading-none">R${item.cleanStake.toFixed(2)}</td>
-                      <td className="px-1 py-1 sm:px-3 sm:py-3 text-center font-mono text-[10px] sm:text-sm leading-none">
-                        <span className={deficit < 0 ? 'text-red-500/60' : 'text-zinc-800'}>
+                      <td className="px-1 py-1 sm:px-3 sm:py-3 text-center font-mono text-[10px] sm:text-[13px] text-zinc-50 leading-none antialiased tracking-tighter font-extrabold [text-rendering:optimizeLegibility]">R${item.cleanStake.toFixed(2)}</td>
+                      <td className="px-1 py-1 sm:px-3 sm:py-3 text-center font-mono text-[10px] sm:text-[13px] leading-none antialiased tracking-tighter [text-rendering:optimizeLegibility]">
+                        <span className={deficit < 0 ? 'text-red-500/90 font-extrabold' : 'text-zinc-800'}>
                           {deficit < 0 ? `-R$ ${Math.abs(deficit).toFixed(2)}` : '-'}
                         </span>
                       </td>
-                      <td className="px-2 py-1 sm:px-6 sm:py-3 text-right font-black leading-none">
-                        <span className={`text-sm sm:text-xl ${lucroCen >= 0 ? 'text-emerald-400 text-glow-profit' : 'text-red-400'}`}>
+                      <td className="px-2 py-1 sm:px-6 sm:py-3 text-right leading-none antialiased">
+                        <span className={`text-sm sm:text-xl font-black tracking-tighter ${lucroCen >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                           {lucroCen >= 0 ? '+' : ''}R$ {lucroCen.toFixed(2)}
                         </span>
                       </td>
@@ -550,8 +550,8 @@ export const AddFaseModal: React.FC<AddFaseModalProps> = ({ isOpen = true, onClo
 
           <div className="shrink-0 pt-6 mt-6 border-t border-zinc-900 flex gap-3">
             <button type="button" onClick={onClose} className="flex-1 h-12 bg-white/5 border border-white/5 rounded-xl text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-white transition-all shadow-lg">Cancelar</button>
-            <button type="button" onClick={handleSalvarComCalculos} className="flex-[2] h-12 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-[10px] font-black uppercase tracking-widest text-white shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2">
-              <Check size={16} /> Confirmar Operação 🔥
+            <button type="button" onClick={handleSalvarComCalculos} className="flex-[2] h-12 bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest text-emerald-400 shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2">
+              <Check size={16} /> Confirmar Operação
             </button>
           </div>
         </div>

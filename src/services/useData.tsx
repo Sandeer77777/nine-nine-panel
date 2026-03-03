@@ -58,6 +58,13 @@ const toDbOperacao = (op: any) => {
 const mapParceria = (p: any) => ({ ...p, id: p.id, nome: p.nome, dataCadastro: p.created_at });
 const mapCasa = (c: any) => ({ id: c.id, nome: c.nome, status: c.status, saldo: Number(c.saldo || 0), saldoBonus: Number(c.saldoBonus || 0) });
 
+const CASAS_PADRAO = [
+  "Bet365", "Bet7k", "Betano", "Betbra", "Betesporte", "Betnacional", 
+  "Betpix365", "Br4bet", "Esportivabet", "Estrelabet", "Jogodeouro", "Kto", 
+  "Lotogreen", "Mcgames", "Novibet", "Pixbet", "Sportingbet", "Sporty", "Stake", 
+  "Superbet", "Tradeball", "Vaidebet", "Vivasorte"
+].map((nome, i) => ({ id: -(i + 1), nome, status: 'Ativo', saldo: 0, saldoBonus: 0 }));
+
 interface DataContextType {
   operacoes: any[]; parcerias: any[]; casasApostas: any[]; transacoes: any[]; bancaInicial: number; loading: boolean;
   contasParceiros: any[]; configuracoes: any[];
@@ -67,6 +74,7 @@ interface DataContextType {
   addParceiro: (p: any) => Promise<void>; deleteParceiro: (id: number) => Promise<void>;
   addCasaAposta: (c: any) => Promise<void>; deleteCasaAposta: (id: number) => Promise<void>;
   updateCasaAposta: (id: number, data: any) => Promise<void>;
+  toggleCasaVisibilidade: (nome: string) => Promise<void>;
   addContaParceiro: (conta: any) => Promise<void>; updateContaParceiro: (id: number, data: any) => Promise<void>; deleteContaParceiro: (id: number) => Promise<void>;
   updateBanca: (val: number) => Promise<void>; fullReload: () => void;
   selectiveResetData: (tables: { [key: string]: boolean }) => Promise<void>;
@@ -105,9 +113,26 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         supabase.from('configuracoes').select('*')
       ]);
 
+      if (pars.error) console.error("[Data] Erro Parceiros:", pars.error);
+      console.log("[Data] Parceiros brutos do banco:", pars.data);
+
       setOperacoes(ops.data?.map(mapOperacao) || []);
       setParcerias(pars.data?.map(mapParceria) || []);
-      setCasasApostas(casas.data?.map(mapCasa) || []);
+      
+      // MESCLAGEM DE CASAS: Padrão + Customizadas do Banco
+      const casasBanco = casas.data?.map(mapCasa) || [];
+      const nomesBanco = new Set(casasBanco.map(c => c.nome.toLowerCase()));
+      
+      // Carrega casas ocultas das configurações
+      const casasOcultasRaw = configs.data?.find(c => c.chave === 'casas_ocultas')?.valor || '';
+      const nomesOcultos = new Set(casasOcultasRaw.split(',').map((n: string) => n.trim().toLowerCase()));
+
+      const casasFiltradas = [
+        ...casasBanco,
+        ...CASAS_PADRAO.filter(c => !nomesBanco.has(c.nome.toLowerCase()) && !nomesOcultos.has(c.nome.toLowerCase()))
+      ].sort((a, b) => a.nome.localeCompare(b.nome));
+      
+      setCasasApostas(casasFiltradas);
       setContasParceiros(contas.data || []);
       setTransacoes(trans.data || []);
       if (configs.data) {
@@ -213,6 +238,43 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const addParceiro = useCallback(async (p: any) => { const user = await getSafeUser(); await supabase.from('parcerias').insert({ ...p, user_id: user.id }); fetchData(true); }, [fetchData]);
   const deleteParceiro = useCallback(async (id: number) => { const user = await getSafeUser(); await supabase.from('parcerias').delete().eq('id', id).eq('user_id', user.id); fetchData(true); }, [fetchData]);
   const updateCasaAposta = useCallback(async (id: number, data: any) => { const user = await getSafeUser(); await supabase.from('casas_apostas').update(data).eq('id', id).eq('user_id', user.id); fetchData(true); }, [fetchData]);
+  const toggleCasaVisibilidade = useCallback(async (nome: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Busca a config atual direto do banco para evitar desalinhamento de estado
+      const { data: currentConfig } = await supabase
+        .from('configuracoes')
+        .select('valor')
+        .eq('chave', 'casas_ocultas')
+        .eq('user_id', user.id)
+        .single();
+
+      let lista = currentConfig?.valor ? currentConfig.valor.split(',') : [];
+      const nomeLower = nome.trim().toLowerCase();
+      
+      if (lista.includes(nomeLower)) {
+        lista = lista.filter((n: string) => n !== nomeLower);
+      } else {
+        lista.push(nomeLower);
+      }
+
+      const { error } = await supabase.from('configuracoes').upsert({ 
+        chave: 'casas_ocultas', 
+        valor: lista.join(','), 
+        user_id: user.id 
+      }, { onConflict: 'chave,user_id' });
+
+      if (error) throw error;
+      await fetchData(true);
+      toast.success(lista.includes(nomeLower) ? "Casa ocultada" : "Casa visível");
+    } catch (err: any) { 
+      console.error(err);
+      toast.error("Erro ao sincronizar visibilidade"); 
+    }
+  }, [fetchData]);
+
   const addContaParceiro = useCallback(async (c: any) => { const user = await getSafeUser(); await supabase.from('contas_parceiros').insert({ ...c, user_id: user.id }); fetchData(true); }, [fetchData]);
   const updateContaParceiro = useCallback(async (id: number, d: any) => { const user = await getSafeUser(); await supabase.from('contas_parceiros').update(d).eq('id', id).eq('user_id', user.id); fetchData(true); }, [fetchData]);
   const deleteContaParceiro = useCallback(async (id: number) => { const user = await getSafeUser(); await supabase.from('contas_parceiros').delete().eq('id', id).eq('user_id', user.id); fetchData(true); }, [fetchData]);

@@ -7,6 +7,12 @@
 @layer base {
   body {
     @apply bg-black text-text-dark font-sans min-h-screen selection:bg-profit/30 selection:text-white antialiased overflow-x-hidden;
+    /* Ultra-High Fidelity Typography */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    
     /* Smooth transition for theme change if needed */
     transition: background-color 0.3s ease, color 0.3s ease;
   }
