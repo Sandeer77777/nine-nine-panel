@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../lib/utils';
 import { 
   Trash2, SquarePen, Gift, Plus, CheckCircle2, 
-  RefreshCcw, Copy, Calendar, Users, Target, Rocket, PlusCircle
+  RefreshCcw, Copy, Calendar, Users, Target, Rocket, PlusCircle, Trophy
 } from 'lucide-react';
 
 interface OperacaoCardProps {
@@ -101,8 +101,21 @@ export const OperacaoCard: React.FC<OperacaoCardProps> = ({
                 {(operacao.fases || []).map((fase: any, idx: number) => (
                   <div key={idx} className="bg-black/40 border border-white/5 p-3 rounded-xl space-y-2 group/fase transition-all hover:bg-black/60 relative flex flex-col justify-between">
                     <div className="flex justify-between items-center pb-1.5 border-b border-white/5">
-                        <span className="text-[8px] font-black text-white uppercase italic">{fase.nome === 'FREEBET' ? 'Free bet' : (fase.nome || `Fase #${idx+1}`)}</span>
-                        <button onClick={() => onEditFase?.(operacao.id, fase, idx)} className="p-1 rounded bg-white/5 text-zinc-500 hover:text-white transition-all"><SquarePen size={10}/></button>
+                        <div className="flex flex-col">
+                          <span className="text-[8px] font-black text-white uppercase italic">{fase.nome === 'FREEBET' ? 'Free bet' : (fase.nome || `Fase #${idx+1}`)}</span>
+                          {fase.jogo_fase && (
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <Trophy size={8} className="text-emerald-500/70" />
+                              <span className="text-[7px] font-bold text-zinc-500 uppercase truncate max-w-[120px]">
+                                {fase.jogo_fase} {fase.horario_fase && `• ${fase.horario_fase}`}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => onEditFase?.(operacao.id, fase, idx)} className="p-1 rounded bg-white/5 text-zinc-500 hover:text-white transition-all"><SquarePen size={10}/></button>
+                          <button onClick={() => onDeleteFase?.(operacao.id, idx)} className="p-1 rounded bg-white/5 text-zinc-500 hover:text-red-500 transition-all"><Trash2 size={10}/></button>
+                        </div>
                     </div>
                     <div className="space-y-1 py-1">
                         {(fase.entradas || []).map((ent: any, i: number) => (

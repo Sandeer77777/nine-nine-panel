@@ -26,7 +26,6 @@ const mapOperacao = (op: any) => ({
 });
 
 const toDbOperacao = (op: any) => {
-    // Sanitização rigorosa para evitar dados mortos ou corrompidos no Supabase
     const safeValue = (val: any) => {
         if (typeof val === 'number') return isNaN(val) ? 0 : val;
         if (!val) return 0;
@@ -34,7 +33,7 @@ const toDbOperacao = (op: any) => {
         return isNaN(parsed) ? 0 : parsed;
     };
 
-    const payload: any = {
+    return {
         nome: op.nome || 'Operação sem nome',
         data: op.data || new Date().toISOString(),
         status: op.status || 'em_andamento',
@@ -50,21 +49,14 @@ const toDbOperacao = (op: any) => {
         fases: Array.isArray(op.fases) ? op.fases : [],
         is_dg: !!(op.isDG ?? op.is_dg),
         lucro_dg: safeValue(op.lucroDG ?? op.lucro_dg),
-        repassar_comissao_dg: op.repassarComissaoDG === undefined ? (op.repassar_comissao_dg ?? true) : op.repassarComissaoDG
+        repassar_comissao_dg: op.repassarComissaoDG === undefined ? (op.repassar_comissao_dg ?? true) : op.repassarComissaoDG,
+        data_criacao: op.dataCriacao || undefined,
+        data_finalizacao: op.dataFinalizacao || undefined
     };
-    if (op.dataCriacao) payload.data_criacao = op.dataCriacao;
-    if (op.dataFinalizacao) payload.data_finalizacao = op.dataFinalizacao;
-    return payload;
 };
 
-const mapParceria = (p: any) => ({
-  ...p, id: p.id, nome: p.nome, dataCadastro: p.created_at
-});
-
-const mapCasa = (c: any) => ({ 
-  id: c.id, nome: c.nome, status: c.status,
-  saldo: Number(c.saldo || 0), saldoBonus: Number(c.saldoBonus || 0)
-});
+const mapParceria = (p: any) => ({ ...p, id: p.id, nome: p.nome, dataCadastro: p.created_at });
+const mapCasa = (c: any) => ({ id: c.id, nome: c.nome, status: c.status, saldo: Number(c.saldo || 0), saldoBonus: Number(c.saldoBonus || 0) });
 
 interface DataContextType {
   operacoes: any[]; parcerias: any[]; casasApostas: any[]; transacoes: any[]; bancaInicial: number; loading: boolean;
@@ -77,6 +69,7 @@ interface DataContextType {
   updateCasaAposta: (id: number, data: any) => Promise<void>;
   addContaParceiro: (conta: any) => Promise<void>; updateContaParceiro: (id: number, data: any) => Promise<void>; deleteContaParceiro: (id: number) => Promise<void>;
   updateBanca: (val: number) => Promise<void>; fullReload: () => void;
+  selectiveResetData: (tables: { [key: string]: boolean }) => Promise<void>;
 }
 const DataContext = createContext<DataContextType>({} as any);
 
@@ -90,21 +83,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [bancaInicial, setBancaInicial] = useState(0);
   const [loading, setLoading] = useState(true);
   const isFetching = React.useRef(false);
-  const hasLoadedOnce = React.useRef(false);
+
+  const clearState = useCallback(() => {
+    setOperacoes([]); setParcerias([]); setCasasApostas([]); setContasParceiros([]); setTransacoes([]); setConfiguracoes([]); setBancaInicial(0);
+  }, []);
 
   const fetchData = useCallback(async (isSilent = false) => {
     if (isFetching.current) return;
-    
     try {
       isFetching.current = true;
-      // Só mostra loading se não for uma atualização silenciosa e for a primeira vez
-      if (!isSilent && !hasLoadedOnce.current) setLoading(true);
-      
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        setLoading(false);
-        return;
-      }
+      if (!session) { clearState(); setLoading(false); return; }
+      if (!isSilent) setLoading(true);
 
       const [ops, pars, casas, contas, trans, configs] = await Promise.all([
         supabase.from('operacoes').select('*').order('data_criacao', { ascending: false }),
@@ -115,182 +105,125 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         supabase.from('configuracoes').select('*')
       ]);
 
-      if (ops.data) setOperacoes(ops.data.map(mapOperacao));
-      if (pars.data) setParcerias(pars.data.map(mapParceria));
-      if (casas.data) setCasasApostas(casas.data.map(mapCasa));
-      if (contas.data) setContasParceiros(contas.data);
-      if (trans.data) setTransacoes(trans.data);
+      setOperacoes(ops.data?.map(mapOperacao) || []);
+      setParcerias(pars.data?.map(mapParceria) || []);
+      setCasasApostas(casas.data?.map(mapCasa) || []);
+      setContasParceiros(contas.data || []);
+      setTransacoes(trans.data || []);
       if (configs.data) {
         setConfiguracoes(configs.data);
         const banca = configs.data.find(c => c.chave === 'banca_inicial');
-        if (banca) setBancaInicial(Number(banca.valor));
+        setBancaInicial(banca ? Number(banca.valor) : 0);
       }
-      hasLoadedOnce.current = true;
-    } catch (error) { 
-      console.error("[Data] Sync Error:", error); 
-    }
-    finally { 
-      setLoading(false);
-      setTimeout(() => { isFetching.current = false; }, 2000);
-    }
-  }, []);
+    } catch (error) { console.error("[Data] Sync Error:", error); }
+    finally { setLoading(false); setTimeout(() => { isFetching.current = false; }, 1000); }
+  }, [clearState]);
 
   useEffect(() => {
-    fetchData();
-    
+    fetchData(true);
     const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_IN') fetchData();
-      if (event === 'SIGNED_OUT') {
-        setOperacoes([]); setParcerias([]); setCasasApostas([]); setContasParceiros([]); setTransacoes([]); setConfiguracoes([]);
-        hasLoadedOnce.current = false;
-      }
+      if (event === 'SIGNED_IN') fetchData(true);
+      if (event === 'SIGNED_OUT') clearState();
     });
+    const channel = supabase.channel('realtime-safe').on('postgres_changes', { event: '*', schema: 'public' }, () => fetchData(true)).subscribe();
+    return () => { supabase.removeChannel(channel); authSub.unsubscribe(); };
+  }, [fetchData, clearState]);
 
-    let channel: any = null;
+  // AUXILIAR PARA GARANTIR USER_ID
+  const getSafeUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Usuário não autenticado");
+    return user;
+  };
+
+  const addOperacao = useCallback(async (op: any) => {
     try {
-      // O sync agora é SILENCIOSO - Não ativa o loading global que reseta o app
-      channel = supabase.channel('realtime-obediente').on('postgres_changes', { event: '*', schema: 'public' }, () => {
-          fetchData(true); 
-      }).subscribe();
-    } catch (e) {
-      console.error("[Data] Realtime Subscription failed:", e);
-    }
-
-    return () => { 
-      if (channel) supabase.removeChannel(channel);
-      authSub.unsubscribe();
-    };
+      const user = await getSafeUser();
+      const { error } = await supabase.from('operacoes').insert({ ...toDbOperacao(op), user_id: user.id });
+      if (error) throw error;
+      toast.success("Operação criada!");
+      fetchData(true);
+    } catch (err: any) { toast.error(err.message); }
   }, [fetchData]);
 
   const updateOperacao = useCallback(async (id: number, newData: any) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuário não autenticado");
-
-      const payload = { 
-        ...toDbOperacao(newData),
-        user_id: user.id 
-      };
-      
-      const { error } = await supabase.from('operacoes').update(payload).eq('id', id);
+      const user = await getSafeUser();
+      const { error } = await supabase.from('operacoes').update({ ...toDbOperacao(newData), user_id: user.id }).eq('id', id).eq('user_id', user.id);
       if (error) throw error;
-      fetchData();
-    } catch (err: any) { toast.error(`Erro: ${err.message}`); }
+      fetchData(true);
+    } catch (err: any) { toast.error(err.message); }
   }, [fetchData]);
 
-  const addOperacao = useCallback(async (op: any) => {
+  const deleteOperacao = useCallback(async (id: number) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuário não autenticado");
-
-      const payload = { 
-        ...toDbOperacao(op),
-        user_id: user.id 
-      };
-
-      const { error } = await supabase.from('operacoes').insert(payload);
+      const user = await getSafeUser();
+      const { error } = await supabase.from('operacoes').delete().eq('id', id).eq('user_id', user.id);
       if (error) throw error;
-      toast.success("Criado!");
-      fetchData();
-    } catch (err: any) { toast.error(`Erro: ${err.message}`); }
-  }, [fetchData]);
-
-  const deleteOperacao = useCallback(async (id: number) => { 
-    try {
-      const { error } = await supabase.from('operacoes').delete().eq('id', id);
-      if (error) throw error;
-      toast.success("Excluído!");
-      fetchData();
+      toast.success("Excluída!");
+      fetchData(true);
     } catch (err: any) { toast.error("Erro ao excluir"); }
   }, [fetchData]);
 
-  const duplicateOperation = useCallback(async (op: any) => {
+  const addCasaAposta = useCallback(async (c: any) => {
     try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error("Usuário não autenticado");
-
-        const { id, created_at, ...payload } = op;
-        const dbPayload = {
-            ...toDbOperacao(payload),
-            nome: `${op.nome} (Cópia)`,
-            user_id: user.id
-        };
-        
-        const { error } = await supabase.from('operacoes').insert(dbPayload);
-        if (error) throw error;
-        toast.success("Duplicada!");
-        fetchData();
-    } catch (error: any) { toast.error("Erro ao duplicar"); }
-  }, [fetchData]);
-
-  const addCasaAposta = useCallback(async (c: any) => { 
-    const { data: { user } } = await supabase.auth.getUser();
-    await supabase.from('casas_apostas').insert({ ...c, user_id: user?.id }); 
-    await fetchData(); 
-  }, [fetchData]);
-  const deleteCasaAposta = useCallback(async (id: number) => { await supabase.from('casas_apostas').delete().eq('id', id); await fetchData(); }, [fetchData]);
-  const updateCasaAposta = useCallback(async (id: number, data: any) => { await supabase.from('casas_apostas').update(data).eq('id', id); await fetchData(); }, [fetchData]);
-  const addTransacao = useCallback(async (t: any) => { 
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const payload = { ...t, user_id: user?.id };
-      const { error } = await supabase.from('transacoes').insert(payload);
+      const user = await getSafeUser();
+      const { error } = await supabase.from('casas_apostas').insert({ ...c, user_id: user.id });
       if (error) throw error;
-      await fetchData(); 
-    } catch (err: any) {
-      toast.error("Erro ao registrar transação");
-    }
+      fetchData(true);
+    } catch (err: any) { toast.error("Erro ao adicionar casa"); }
   }, [fetchData]);
 
-  const deleteTransacao = useCallback(async (id: number) => { 
+  const deleteCasaAposta = useCallback(async (id: number) => {
     try {
-      // 1. Remover localmente primeiro (UI rápida)
-      setTransacoes(prev => prev.filter(t => t.id !== id));
-      
-      // 2. Tentar remover no banco
-      const { error } = await supabase.from('transacoes').delete().match({ id });
-      
-      if (error) {
-        // Se der erro no banco, recarrega para voltar o item
-        fetchData();
-        toast.error(`Erro: ${error.message}`);
-        return;
-      }
+      const user = await getSafeUser();
+      const { error } = await supabase.from('casas_apostas').delete().eq('id', id).eq('user_id', user.id);
+      if (error) throw error;
+      fetchData(true);
+    } catch (err: any) { toast.error("Erro ao remover casa"); }
+  }, [fetchData]);
 
-      toast.success("Removido com sucesso!");
-    } catch (err: any) {
-      fetchData();
-      toast.error("Falha na conexão.");
-    }
+  const updateBanca = useCallback(async (v: number) => {
+    try {
+      const user = await getSafeUser();
+      const { error } = await supabase.from('configuracoes').upsert({ chave: 'banca_inicial', valor: v, user_id: user.id }, { onConflict: 'chave,user_id' });
+      if (error) throw error;
+      fetchData(true);
+    } catch (err: any) { toast.error("Erro ao atualizar banca"); }
   }, [fetchData]);
-  const addParceiro = useCallback(async (p: any) => { 
-    const { data: { user } } = await supabase.auth.getUser();
-    await supabase.from('parcerias').insert({ ...p, user_id: user?.id }); 
-    await fetchData(); 
+
+  const selectiveResetData = useCallback(async (tables: { [key: string]: boolean }) => {
+    try {
+      const user = await getSafeUser();
+      const promises = [];
+      if (tables.operacoes) promises.push(supabase.from('operacoes').delete().eq('user_id', user.id));
+      if (tables.transacoes) promises.push(supabase.from('transacoes').delete().eq('user_id', user.id));
+      if (tables.parcerias) promises.push(supabase.from('parcerias').delete().eq('user_id', user.id));
+      if (tables.casasApostas) promises.push(supabase.from('casas_apostas').delete().eq('user_id', user.id));
+      if (tables.contasParceiros) promises.push(supabase.from('contas_parceiros').delete().eq('user_id', user.id));
+      await Promise.all(promises);
+      fetchData(true);
+      toast.success("Ambiente resetado com sucesso!");
+    } catch (err: any) { toast.error("Erro no reset"); }
   }, [fetchData]);
-  const deleteParceiro = useCallback(async (id: number) => { await supabase.from('parcerias').delete().eq('id', id); await fetchData(); }, [fetchData]);
-  const addContaParceiro = useCallback(async (conta: any) => { 
-    const { data: { user } } = await supabase.auth.getUser();
-    await supabase.from('contas_parceiros').insert({ ...conta, user_id: user?.id }); 
-    await fetchData(); 
-  }, [fetchData]);
-  const updateContaParceiro = useCallback(async (id: number, data: any) => { await supabase.from('contas_parceiros').update(data).eq('id', id); await fetchData(); }, [fetchData]);
-  const deleteContaParceiro = useCallback(async (id: number) => { await supabase.from('contas_parceiros').delete().eq('id', id); await fetchData(); }, [fetchData]);
-  const updateBanca = useCallback(async (v: number) => { 
-    const { data: { user } } = await supabase.auth.getUser();
-    await supabase.from('configuracoes').upsert({ chave: 'banca_inicial', valor: v, user_id: user?.id }); 
-    fetchData(); 
-  }, [fetchData]);
+
+  // ... (Demais funções implementadas seguindo o mesmo padrão de segurança .eq('user_id', user.id))
+  const addTransacao = useCallback(async (t: any) => { const user = await getSafeUser(); await supabase.from('transacoes').insert({ ...t, user_id: user.id }); fetchData(true); }, [fetchData]);
+  const deleteTransacao = useCallback(async (id: number) => { const user = await getSafeUser(); await supabase.from('transacoes').delete().eq('id', id).eq('user_id', user.id); fetchData(true); }, [fetchData]);
+  const addParceiro = useCallback(async (p: any) => { const user = await getSafeUser(); await supabase.from('parcerias').insert({ ...p, user_id: user.id }); fetchData(true); }, [fetchData]);
+  const deleteParceiro = useCallback(async (id: number) => { const user = await getSafeUser(); await supabase.from('parcerias').delete().eq('id', id).eq('user_id', user.id); fetchData(true); }, [fetchData]);
+  const updateCasaAposta = useCallback(async (id: number, data: any) => { const user = await getSafeUser(); await supabase.from('casas_apostas').update(data).eq('id', id).eq('user_id', user.id); fetchData(true); }, [fetchData]);
+  const addContaParceiro = useCallback(async (c: any) => { const user = await getSafeUser(); await supabase.from('contas_parceiros').insert({ ...c, user_id: user.id }); fetchData(true); }, [fetchData]);
+  const updateContaParceiro = useCallback(async (id: number, d: any) => { const user = await getSafeUser(); await supabase.from('contas_parceiros').update(d).eq('id', id).eq('user_id', user.id); fetchData(true); }, [fetchData]);
+  const deleteContaParceiro = useCallback(async (id: number) => { const user = await getSafeUser(); await supabase.from('contas_parceiros').delete().eq('id', id).eq('user_id', user.id); fetchData(true); }, [fetchData]);
+  const duplicateOperation = useCallback(async (op: any) => { const user = await getSafeUser(); const { id, created_at, ...p } = op; await supabase.from('operacoes').insert({ ...toDbOperacao(p), nome: `${op.nome} (Cópia)`, user_id: user.id }); fetchData(true); }, [fetchData]);
 
   const value = useMemo(() => ({
     operacoes, parcerias, casasApostas, contasParceiros, transacoes, bancaInicial, loading, configuracoes,
-    addOperacao, updateOperacao, deleteOperacao, duplicateOperation,
-    addTransacao, deleteTransacao,
-    addParceiro, deleteParceiro,
-    addCasaAposta, deleteCasaAposta, updateCasaAposta,
-    addContaParceiro, updateContaParceiro, deleteContaParceiro,
-    updateBanca, fullReload: fetchData
-  }), [operacoes, parcerias, casasApostas, contasParceiros, transacoes, bancaInicial, loading, configuracoes, fetchData]);
+    addOperacao, updateOperacao, deleteOperacao, duplicateOperation, addTransacao, deleteTransacao,
+    addParceiro, deleteParceiro, addCasaAposta, deleteCasaAposta, updateCasaAposta,
+    addContaParceiro, updateContaParceiro, deleteContaParceiro, updateBanca, fullReload: fetchData, selectiveResetData
+  }), [operacoes, parcerias, casasApostas, contasParceiros, transacoes, bancaInicial, loading, configuracoes, fetchData, selectiveResetData]);
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 };

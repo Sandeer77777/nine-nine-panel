@@ -59,6 +59,25 @@ export default function Operacoes() {
     try { await updateOperacao(operacaoId, { ...op, status: newStatus, lucro: lT, investido: iT, retorno: rT }); } catch (error) { console.error(error); }
   };
 
+  const handleDeleteFase = async (operacaoId: string, faseIndex: number) => {
+    const opId = Number(operacaoId);
+    const op = (operacoes || []).find(o => o.id === opId);
+    if (!op) return;
+
+    const novasFases = (op.fases || []).filter((_: any, idx: number) => idx !== faseIndex);
+    
+    // Recalcular métricas totais após remover a fase
+    const tI = novasFases.reduce((s: number, f: any) => s + (cleanMoney(f.investido) || 0), 0);
+    const tR = novasFases.reduce((s: number, f: any) => s + (cleanMoney(f.retorno) || 0), 0);
+    const tL = novasFases.reduce((s: number, f: any) => s + (cleanMoney(f.lucro) || 0), 0);
+
+    try { 
+      await updateOperacao(opId, { ...op, fases: novasFases, investido: tI, retorno: tR, lucro: tL }); 
+    } catch (error) { 
+      console.error("Erro ao deletar fase:", error); 
+    }
+  };
+
   const handleSaveFase = async (entradas: any[], resumo: any) => {
     if (!currentOperacaoId) return;
     const opId = Number(currentOperacaoId);
@@ -66,7 +85,18 @@ export default function Operacoes() {
     if (!op) return;
     const estFinal = entradas[0]?.nome || 'qualificacao';
     const novasFases = [...(op.fases || [])];
-    const nF = { id: nanoid(), nome: estFinal.toUpperCase(), data: new Date().toISOString(), entradas, lucro: resumo.lucro, investido: resumo.investido, retorno: resumo.retorno, status: 'Pendente' };
+    const nF = { 
+      id: nanoid(), 
+      nome: estFinal.toUpperCase(), 
+      data: new Date().toISOString(), 
+      entradas, 
+      lucro: resumo.lucro, 
+      investido: resumo.investido, 
+      retorno: resumo.retorno, 
+      status: 'Pendente',
+      jogo_fase: resumo.jogo, // Persiste o jogo
+      horario_fase: resumo.horario // Persiste o horário
+    };
     if (faseIndexEditing !== undefined) novasFases[faseIndexEditing] = nF; else novasFases.push(nF);
     const tI = novasFases.reduce((s, f) => s + (f.investido || 0), 0);
     const tR = novasFases.reduce((s, f) => s + (f.retorno || 0), 0);
@@ -156,6 +186,7 @@ export default function Operacoes() {
                   <OperacaoCard key={op.id} operacao={op} onDelete={(id) => deleteOperacao(Number(id))} onEdit={(op) => { setEditingOperacao(op); setIsOperacaoModalOpen(true); }}
                       onAddQualificacao={(id) => { setCurrentOperacaoId(String(id)); setModalMode('qualificacao'); setIsModalOpen(true); }}
                       onEditFase={(opId, fase, idx) => { setCurrentOperacaoId(String(opId)); setFaseParaEditar(fase); setFaseIndexEditing(idx); setModalMode(fase.nome.toLowerCase() as any); setIsModalOpen(true); }}
+                      onDeleteFase={handleDeleteFase}
                       onUpdateStatus={handleUpdateStatus} onOpenDG={(op) => { setSelectedOpForDG(op); setIsDGModalOpen(true); }}
                   />
               ))

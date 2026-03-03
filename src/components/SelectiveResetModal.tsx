@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useData } from '../contexts/DataContext';
+import { useData } from '../services/useData';
 import toast from 'react-hot-toast';
 import { cn } from '../lib/utils';
 

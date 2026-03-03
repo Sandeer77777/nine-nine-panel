@@ -103,12 +103,7 @@ export default function OperacaoModal({ isOpen, onClose, editingOperacao }: Oper
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-2"><Hash size={12} className="text-indigo-500" /> Título da Operação</label>
                     <input {...register('procedimento')} placeholder="EX: ARBITRAGEM #001" className="w-full h-12 bg-black/40 border border-white/5 rounded-xl px-5 text-sm text-white outline-none focus:border-profit/50 transition-all uppercase font-bold" />
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-2"><Trophy size={12} className="text-profit" /> Jogo / Partida</label>
-                    <input {...register('jogo')} placeholder="EX: REAL MADRID X BARCELONA" className="w-full h-12 bg-black/40 border border-white/5 rounded-xl px-5 text-sm text-white outline-none focus:border-profit/50 transition-all uppercase font-bold" />
-                  </div>
                 </div>
-
                 <div className="grid grid-cols-3 gap-4">
                    <div className="space-y-1.5"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest text-center block">Data</label><input type="date" {...register('data')} className="w-full h-11 bg-black/40 border border-white/5 rounded-xl text-xs text-white text-center focus:border-profit/50" style={{ colorScheme: 'dark' }} /></div>
                    <div className="space-y-1.5"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest text-center block">Horário</label><input type="time" {...register('horario')} className="w-full h-11 bg-black/40 border border-white/5 rounded-xl text-xs text-white text-center focus:border-profit/50" style={{ colorScheme: 'dark' }} /></div>

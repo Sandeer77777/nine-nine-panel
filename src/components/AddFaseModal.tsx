@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   X, Calculator, Trash2, Zap, Percent, ArrowRightLeft, 
   Rocket, PlusCircle, Check, Gift, Link as LinkIcon, 
   Download, Settings2, ChevronDown, RefreshCcw, SlidersHorizontal, Plus, 
-  Lock, Unlock, LayoutGrid
+  Lock, Unlock, LayoutGrid, Trophy
 } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import { useData } from '../services/useData';
@@ -98,12 +98,16 @@ const CardEntrada = ({ entrada, index, onUpdate, onRemove, casasDisponiveis }: {
 };
 
 export const AddFaseModal: React.FC<AddFaseModalProps> = ({ isOpen = true, onClose, onSave, faseIndex, estrategiaOperacao, faseParaEditar }) => {
-  const { casasApostas } = useData(); 
+  const { casasApostas, operacoes } = useData(); 
   const [entradas, setEntradas] = useState<EntradaState[]>([]); 
   const [importUrl, setImportUrl] = useState(''); 
   const [arredondamento, setArredondamento] = useState<number>(0.01);
   const [showArredondarMenu, setShowArredondarMenu] = useState(false);
   
+  // --- ESTADO DO JOGO ---
+  const [jogo, setJogo] = useState<string>('');
+  const [horario, setHorario] = useState<string>('');
+
   useEffect(() => { if (isOpen && !faseParaEditar) {
     const isRainbowDefault = estrategiaOperacao === 'rainbow';
     setEntradas([{
@@ -119,21 +123,37 @@ export const AddFaseModal: React.FC<AddFaseModalProps> = ({ isOpen = true, onClo
       isLocked: false
     }]); setImportUrl(''); } }, [isOpen, faseParaEditar, estrategiaOperacao]);
 
-  useEffect(() => { if (faseParaEditar && (faseParaEditar.entradas || faseParaEditar.fases)) { const listaEntradas = faseParaEditar.entradas || []; if(listaEntradas.length > 0) { const dados = listaEntradas.map((e: any, idx: number) => ({
-      id: nanoid(), ...e,
-      stake: e.stake ? String(e.stake) : '',
-      odd: e.odd ? String(e.odd) : '',
-      isRainbow: !!e.isRainbow,
-      isPromo: !!e.isPromo,
-      percentualBoost: e.percentualBoost ? String(e.percentualBoost) : '',
-      comissao: e.comissao ? String(e.comissao) : '',
-      valorReembolso: e.valorReembolso ? String(e.valorReembolso) : '',
-      taxaExtracao: e.taxaExtracao ? String(e.taxaExtracao) : '',
-      isLay: !!e.isLay,
-      showBoost: !!e.percentualBoost,
-      showCommission: !!e.comissao,
-      isLocked: idx === 0 
-  })); setEntradas(dados); } } }, [faseParaEditar]);
+  useEffect(() => { 
+    if (faseParaEditar) {
+      if (faseParaEditar.jogo_fase) setJogo(faseParaEditar.jogo_fase);
+      if (faseParaEditar.horario_fase) setHorario(faseParaEditar.horario_fase);
+      
+      if (faseParaEditar.entradas || faseParaEditar.fases) { 
+        const listaEntradas = faseParaEditar.entradas || []; 
+        if(listaEntradas.length > 0) { 
+          const dados = listaEntradas.map((e: any, idx: number) => ({
+            id: nanoid(), ...e,
+            stake: e.stake ? String(e.stake) : '',
+            odd: e.odd ? String(e.odd) : '',
+            isRainbow: !!e.isRainbow,
+            isPromo: !!e.isPromo,
+            percentualBoost: e.percentualBoost ? String(e.percentualBoost) : '',
+            comissao: e.comissao ? String(e.comissao) : '',
+            valorReembolso: e.valorReembolso ? String(e.valorReembolso) : '',
+            taxaExtracao: e.taxaExtracao ? String(e.taxaExtracao) : '',
+            isLay: !!e.isLay,
+            showBoost: !!e.percentualBoost,
+            showCommission: !!e.comissao,
+            isLocked: idx === 0 
+          })); 
+          setEntradas(dados); 
+        } 
+      }
+    } else {
+      setJogo('');
+      setHorario('');
+    }
+  }, [faseParaEditar]);
 
   const calculateStakes = (entradasAtuais: EntradaState[]) => {
     if (entradasAtuais.length === 0) return entradasAtuais;
@@ -187,26 +207,162 @@ export const AddFaseModal: React.FC<AddFaseModalProps> = ({ isOpen = true, onClo
       if (!importUrl) return;
       const urlObj = new URL(importUrl.trim());
       const params = new URLSearchParams(urlObj.search);
-      let dataJson = params.get('entries') || params.get('h');
-      if (!dataJson) return;
-      const entries = JSON.parse(decodeURIComponent(dataJson));
-      if (Array.isArray(entries) && entries.length > 0) {
-        setEntradas(entries.map((item: any, idx: number) => ({ id: nanoid(), casa: '', mercado: '', odd: String(item.o || '').replace(',', '.'), stake: String(item.s || '').replace(',', '.'), comissao: String(item.c || '').replace(',', '.'), isPromo: Number(item.f) === 1, isLay: Number(item.l) === 1, isRainbow: !!item.re, valorReembolso: String(item.re || ''), taxaExtracao: '70', showCommission: !!item.c, showBoost: !!item.b, percentualBoost: String(item.b || ''), isLocked: idx === 0, oddFinal: '', lucro: '', retorno: '' }))); setImportUrl(''); toast.success("Importado!");
+      
+      const mode = params.get('mode') || params.get('m');
+      const ho = (params.get('ho') || '').replace(',', '.');
+      const qs = (params.get('qs') || '').replace(',', '.');
+      const er = (params.get('er') || '70').replace(',', '.');
+      const fv = (params.get('fv') || '').replace(',', '.');
+      
+      let dataJson = params.get('h') || params.get('entries');
+      let entriesJson: any[] = [];
+      
+      if (dataJson) {
+        entriesJson = JSON.parse(decodeURIComponent(dataJson));
       }
-    } catch (e) { toast.error("Erro ao importar."); }
+
+      let novasEntradas: EntradaState[] = [];
+
+      // ESTRUTURA A: ho/qs (Casa Principal)
+      if (ho || qs) {
+        // HIERARQUIA: Se tem fv (valor reembolso) e er (taxa), é REEMBOLSO, não freebet.
+        const temValorReemb = clean(fv) > 0;
+        const isRefund = mode === 'refund' || temValorReemb;
+        const isFreebet = mode === 'freebet' && !temValorReemb;
+
+        novasEntradas.push({
+          id: nanoid(),
+          casa: '',
+          mercado: '',
+          odd: ho,
+          stake: qs,
+          comissao: '',
+          isPromo: isFreebet,
+          isRainbow: isRefund,
+          valorReembolso: isRefund ? fv : '',
+          taxaExtracao: er,
+          isLay: false,
+          showCommission: false,
+          showBoost: false,
+          percentualBoost: '',
+          isLocked: true,
+          oddFinal: '', lucro: '', retorno: ''
+        });
+
+        // Adiciona as coberturas
+        entriesJson.forEach((item: any) => {
+          const itemOdd = String(item.o || '').replace(',', '.');
+          const itemStake = String(item.s || '').replace(',', '.');
+          const itemComm = String(item.c || '').replace(',', '.');
+          const itemBoost = String(item.b || item.i || '').replace(',', '.');
+          const itemVal = String(item.re || '').replace(',', '.');
+          const isLay = Number(item.l) === 1;
+
+          novasEntradas.push({
+            id: nanoid(), casa: '', mercado: '', odd: itemOdd, stake: itemStake,
+            comissao: itemComm,
+            isPromo: Number(item.f) === 1 && !isLay,
+            isRainbow: clean(itemVal) > 0 && !isLay, // Só é reembolso se NÃO for Lay
+            valorReembolso: !isLay ? itemVal : '',
+            taxaExtracao: '70',
+            isLay: isLay,
+            responsabilidade: isLay ? itemVal : null, // Mapeia para responsabilidade se for Lay
+            showCommission: clean(itemComm) > 0,
+            showBoost: clean(itemBoost) > 0,
+            percentualBoost: itemBoost,
+            isLocked: false, oddFinal: '', lucro: '', retorno: ''
+          });
+        });
+      } 
+      // ESTRUTURA B: Tudo no array 'h'
+      else if (entriesJson.length > 0) {
+        novasEntradas = entriesJson.map((item: any, idx: number) => {
+          const itemOdd = String(item.o || '').replace(',', '.');
+          const itemStake = String(item.s || '').replace(',', '.');
+          const itemComm = String(item.c || '').replace(',', '.');
+          const itemBoost = String(item.b || item.i || '').replace(',', '.');
+          const itemVal = String(item.re || '').replace(',', '.');
+          const isLay = Number(item.l) === 1;
+          
+          const hasVal = clean(itemVal) > 0;
+          const isFreebet = Number(item.f) === 1 && !isLay;
+
+          return {
+            id: nanoid(), casa: '', mercado: '', odd: itemOdd, stake: itemStake,
+            comissao: itemComm,
+            isPromo: isFreebet,
+            isRainbow: hasVal && !isLay, // Só é reembolso se NÃO for Lay
+            valorReembolso: !isLay ? itemVal : '',
+            taxaExtracao: '70',
+            isLay: isLay,
+            responsabilidade: isLay ? itemVal : null, // Mapeia para responsabilidade se for Lay
+            showCommission: clean(itemComm) > 0,
+            showBoost: clean(itemBoost) > 0,
+            percentualBoost: itemBoost,
+            isLocked: Number(item.fs) === 1 || idx === 0,
+            oddFinal: '', lucro: '', retorno: ''
+          };
+        });
+      }
+
+      if (novasEntradas.length > 0) {
+        setEntradas(novasEntradas);
+        setImportUrl('');
+        const tipo = novasEntradas.some(e => e.isRainbow) ? 'REEMBOLSO' : novasEntradas.some(e => e.isPromo) ? 'FREEBET' : 'NORMAL';
+        toast.success(`Importado como ${tipo}`);
+      }
+    } catch (e) { 
+      console.error("[Import Error]", e);
+      toast.error("Falha na importação."); 
+    }
+  };
+
+  const entradasRender = entradas.map(item => { const oddBase = clean(item.odd); let oddFinal = oddBase; let oddParaCalculo = oddBase; const comissao = clean(item.comissao) / 100; const boost = clean(item.percentualBoost) / 100; let investimento = clean(item.stake); if (item.isLay) { if (oddBase > 0) { oddParaCalculo = oddBase - comissao; investimento = clean(item.stake) * (oddBase - 1); } } else { if (boost > 0) oddFinal = oddBase + ((oddBase - 1) * boost); if (item.isPromo) { oddParaCalculo = (oddFinal - 1) * (1 - comissao); investimento = 0; } else { oddParaCalculo = 1 + ((oddFinal - 1) * (1 - comissao)); } } return { ...item, oddFinalDisplay: oddFinal > 0 ? oddFinal.toFixed(2) : '-', oddParaCalculo, investimento, cleanStake: clean(item.stake) }; });
+  const totalInv = entradasRender.reduce((acc, cur) => acc + cur.investimento, 0);
+  const lucros = entradasRender.map((itemV, idx) => { 
+    const ret = itemV.cleanStake * itemV.oddParaCalculo; 
+    const refund = entradasRender.reduce((acc, it, i) => (i === idx ? acc : acc + (it.isRainbow ? clean(it.valorReembolso) * (clean(it.taxaExtracao) / 100) : 0)), 0); 
+    return ret - totalInv + refund; 
+  });
+
+  const totalLucro = Math.min(...lucros);
+  
+  // CÁLCULO DE ROI PROFISSIONAL (ESTILO SHARK)
+  const roi = useMemo(() => {
+    if (totalInv <= 0 && totalLucro <= 0) return 0;
+    
+    // Se houver uma casa com Freebet, o ROI é a Retenção da Freebet (Lucro / Valor da Freebet)
+    const casaFreebet = entradas.find(e => e.isPromo);
+    if (casaFreebet && clean(casaFreebet.stake) > 0) {
+        return (totalLucro / clean(casaFreebet.stake)) * 100;
+    }
+    
+    // Caso contrário (Arbi ou Reembolso), é o ROI sobre o Investimento Total
+    return totalInv > 0 ? (totalLucro / totalInv) * 100 : 0;
+  }, [totalLucro, totalInv, entradas]);
+
+  // Verifica se o modo Reembolso está ativo para mostrar a coluna Déficit
+  const temDeficit = entradas.some(e => e.isRainbow);
+
+  const handleSalvarComCalculos = () => { 
+    const dados = entradasRender.map(item => ({ 
+      ...item, 
+      lucro: (item.cleanStake * item.oddParaCalculo - totalInv).toFixed(2), 
+      retorno: (item.cleanStake * item.oddParaCalculo).toFixed(2),
+      jogo_fase: jogo, // Salva o nome do jogo específico desta fase
+      horario_fase: horario, // Salva o horário específico desta fase
+      deficit: ((item.cleanStake * item.oddParaCalculo) - totalInv).toFixed(2) // Salva o déficit bruto
+    })); 
+    onSave(dados, { 
+      lucro: totalLucro, 
+      investido: totalInv, 
+      retorno: totalLucro + totalInv,
+      jogo: jogo, 
+      horario: horario 
+    }); 
   };
 
   if (!isOpen) return null;
-  const entradasRender = entradas.map(item => { const oddBase = clean(item.odd); let oddFinal = oddBase; let oddParaCalculo = oddBase; const comissao = clean(item.comissao) / 100; const boost = clean(item.percentualBoost) / 100; let investimento = clean(item.stake); if (item.isLay) { if (oddBase > 0) { oddParaCalculo = oddBase - comissao; investimento = clean(item.stake) * (oddBase - 1); } } else { if (boost > 0) oddFinal = oddBase + ((oddBase - 1) * boost); if (item.isPromo) { oddParaCalculo = (oddFinal - 1) * (1 - comissao); investimento = 0; } else { oddParaCalculo = 1 + ((oddFinal - 1) * (1 - comissao)); } } return { ...item, oddFinalDisplay: oddFinal > 0 ? oddFinal.toFixed(2) : '-', oddParaCalculo, investimento, cleanStake: clean(item.stake) }; });
-  const totalInv = entradasRender.reduce((acc, cur) => acc + cur.investimento, 0);
-  const lucros = entradasRender.map((itemV, idx) => { const ret = itemV.cleanStake * itemV.oddParaCalculo; const refund = entradasRender.reduce((acc, it, i) => (i === idx ? acc : acc + (it.isRainbow ? clean(it.valorReembolso) * (clean(it.taxaExtracao) / 100) : 0)), 0); return ret - totalInv + refund; });
-  const totalLucro = Math.min(...lucros);
-  const roi = totalInv > 0 ? (totalLucro / totalInv) * 100 : 0;
-
-  const handleSalvarComCalculos = () => { 
-    const dados = entradasRender.map(item => ({ ...item, lucro: (item.cleanStake * item.oddParaCalculo - totalInv).toFixed(2), retorno: (item.cleanStake * item.oddParaCalculo).toFixed(2) })); 
-    onSave(dados, { lucro: totalLucro, investido: totalInv, retorno: totalLucro + totalInv }); 
-  };
 
   return createPortal(
     <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/90 backdrop-blur-md p-2 md:p-4 overflow-y-auto">
@@ -218,9 +374,35 @@ export const AddFaseModal: React.FC<AddFaseModalProps> = ({ isOpen = true, onClo
               <div className="p-2 sm:p-3 bg-cyan-500/10 rounded-xl border border-cyan-500/20 text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.1)]">
                 <Calculator size={20} className="sm:w-6 sm:h-6" />
               </div>
-              <div>
-                <h2 className="text-lg sm:text-xl font-black text-white uppercase italic tracking-tight leading-none">Calculadora</h2>
-                <p className="text-[7px] sm:text-[8px] text-zinc-600 font-black uppercase tracking-widest mt-1">Enterprise Suite</p>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg sm:text-xl font-black text-white uppercase italic tracking-tight leading-none">Calculadora</h2>
+                  <div className="px-2 py-0.5 bg-cyan-500/10 border border-cyan-500/20 rounded text-[7px] font-black text-cyan-400 uppercase tracking-widest">v2.1</div>
+                </div>
+                
+                {/* ÁREA DO JOGO - INPUT FIXO ESTILIZADO (MANUAL) */}
+                <div className="mt-2 space-y-1.5 max-w-md animate-in slide-in-from-left-2 duration-500">
+                  <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-2">
+                    <Trophy size={12} className="text-emerald-500" /> Jogo / Partida
+                  </label>
+                  <div className="flex gap-2">
+                    <input 
+                      placeholder="EX: REAL MADRID X BARCELONA" 
+                      value={jogo}
+                      onChange={(e) => setJogo(e.target.value.toUpperCase())}
+                      className="flex-1 h-10 bg-black/40 border border-white/5 rounded-xl px-4 text-[11px] text-white outline-none focus:border-emerald-500/50 transition-all uppercase font-bold placeholder:text-zinc-800" 
+                    />
+                    <div className="relative">
+                      <input 
+                        type="time"
+                        value={horario}
+                        onChange={(e) => setHorario(e.target.value)}
+                        className="w-20 sm:w-24 h-9 sm:h-10 bg-black/40 border border-white/5 rounded-xl px-2 sm:px-3 text-[10px] sm:text-[11px] text-white outline-none focus:border-emerald-500/50 transition-all font-bold"
+                        style={{ colorScheme: 'dark' }}
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
             <button type="button" onClick={onClose} className="p-2 sm:p-3 bg-zinc-900 hover:bg-zinc-800 rounded-xl text-zinc-500 hover:text-white transition-all border border-zinc-800 relative shadow-lg">
@@ -289,52 +471,75 @@ export const AddFaseModal: React.FC<AddFaseModalProps> = ({ isOpen = true, onClo
             ))}
           </div>
           
-          <div className="mt-3 sm:mt-8 bg-[#0E0E10] p-2 sm:p-6 rounded-xl sm:rounded-[1.5rem] border border-zinc-900 shadow-2xl">
+          <div className="mt-3 sm:mt-4 bg-[#0E0E10] p-2 sm:p-4 rounded-xl sm:rounded-[1.5rem] border border-zinc-900 shadow-2xl">
             <div className="overflow-x-auto custom-scrollbar rounded-lg border border-zinc-800 bg-black/40">
-              <table className="w-full text-left text-[6px] sm:text-[9px] border-collapse min-w-[400px] sm:min-w-full">
+              <table className="w-full text-left text-[6px] sm:text-[9px] border-collapse min-w-[500px] sm:min-w-full">
                 <thead className="bg-black/80 border-b border-zinc-900 text-[7px] sm:text-[10px] font-black text-zinc-500 uppercase tracking-tight sm:tracking-widest">
                   <tr>
-                    <th className="px-2 py-1 sm:px-8 sm:py-6">Cenário</th>
-                    <th className="px-1 py-1 sm:px-4 sm:py-6 text-center">Odd</th>
-                    <th className="px-1 py-1 sm:px-4 sm:py-6 text-center">Stake</th>
-                    <th className="px-2 py-1 sm:px-8 sm:py-6 text-right">Resultado</th>
+                    <th className="px-2 py-1 sm:px-6 sm:py-3 text-left">Cenário</th>
+                    <th className="px-1 py-1 sm:px-3 sm:py-3 text-center">Odd</th>
+                    <th className="px-1 py-1 sm:px-3 sm:py-3 text-center">Stake</th>
+                    <th className="px-1 py-1 sm:px-3 sm:py-3 text-center text-red-500/70">Déficit</th>
+                    <th className="px-2 py-1 sm:px-6 sm:py-3 text-right text-emerald-500/70">Lucro</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-900 bg-black/20">
                   {entradasRender.map((item, index) => {
+                    const cashReturn = item.cleanStake * item.oddParaCalculo;
+                    const deficit = cashReturn - totalInv;
                     const lucroCen = lucros[index];
+                    
                     return (<tr key={index} className="hover:bg-white/[0.02] transition-colors">
-                      <td className="px-2 py-1 sm:px-8 sm:py-6">
-                        <span className="text-[10px] sm:text-base font-black text-white uppercase italic leading-tight">{item.casa || `Casa ${index + 1}`}</span>
-                        <div className="flex gap-1 mt-0">
-                          {item.isPromo && <span className="text-[5px] sm:text-[8px] px-1 py-0 rounded-sm font-black uppercase border bg-emerald-500/10 text-emerald-400 border-emerald-500/20">Free</span>}
-                          {item.isRainbow && <span className="text-[5px] sm:text-[8px] px-1 py-0 rounded-sm font-black uppercase border bg-purple-500/10 text-purple-400 border-purple-500/20">Reemb</span>}
+                      <td className="px-2 py-1 sm:px-6 sm:py-3">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] sm:text-sm font-black text-white uppercase italic leading-tight">{item.casa || `Casa ${index + 1}`}</span>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {item.isPromo && <span className="text-[5px] sm:text-[7px] px-1 py-0.5 rounded-sm font-black uppercase border bg-emerald-500/10 text-emerald-400 border-emerald-500/20">Freebet</span>}
+                            {item.isRainbow && <span className="text-[5px] sm:text-[7px] px-1 py-0.5 rounded-sm font-black uppercase border bg-purple-500/10 text-purple-400 border-purple-500/20 text-nowrap">Reemb R${item.valorReembolso}</span>}
+                            {item.isLay && <span className="text-[5px] sm:text-[7px] px-1 py-0.5 rounded-sm font-black uppercase border bg-red-500/10 text-red-400 border-red-500/20">Lay</span>}
+                          </div>
                         </div>
                       </td>
-                      <td className="px-1 py-1 sm:px-4 sm:py-6 text-center font-mono text-[10px] sm:text-base text-zinc-500 leading-none">{item.oddFinalDisplay}</td>
-                      <td className="px-1 py-1 sm:px-4 sm:py-6 text-center font-mono text-[10px] sm:text-base text-zinc-300 leading-none">R${item.cleanStake.toFixed(2)}</td>
-                      <td className={`px-2 py-1 sm:px-8 sm:py-6 text-right font-black text-sm sm:text-2xl ${lucroCen >= 0 ? 'text-emerald-400' : 'text-red-400'} leading-none`}>{lucroCen >= 0 ? '+' : ''}R$ {lucroCen.toFixed(2)}</td>
+                      <td className="px-1 py-1 sm:px-3 sm:py-3 text-center font-mono text-[10px] sm:text-sm text-zinc-500 leading-none">
+                        <div className="flex flex-col items-center">
+                          <span>{item.oddFinalDisplay}</span>
+                          {item.odd !== item.oddFinalDisplay && item.oddFinalDisplay !== '-' && (
+                            <span className="text-[6px] sm:text-[8px] text-zinc-700 line-through decoration-red-500/50">{item.odd}</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-1 py-1 sm:px-3 sm:py-3 text-center font-mono text-[10px] sm:text-sm text-zinc-300 leading-none">R${item.cleanStake.toFixed(2)}</td>
+                      <td className="px-1 py-1 sm:px-3 sm:py-3 text-center font-mono text-[10px] sm:text-sm leading-none">
+                        <span className={deficit < 0 ? 'text-red-500/60' : 'text-zinc-800'}>
+                          {deficit < 0 ? `-R$ ${Math.abs(deficit).toFixed(2)}` : '-'}
+                        </span>
+                      </td>
+                      <td className="px-2 py-1 sm:px-6 sm:py-3 text-right font-black leading-none">
+                        <span className={`text-sm sm:text-xl ${lucroCen >= 0 ? 'text-emerald-400 text-glow-profit' : 'text-red-400'}`}>
+                          {lucroCen >= 0 ? '+' : ''}R$ {lucroCen.toFixed(2)}
+                        </span>
+                      </td>
                     </tr>);
                   })}
                 </tbody>
                 <tfoot className="bg-black/80 border-t border-zinc-900">
                   <tr>
-                    <td className="px-2 py-3 sm:px-4 sm:py-6" colSpan={2}>
+                    <td className="px-2 py-3 sm:px-4 sm:py-4" colSpan={2}>
                         <div className="flex gap-3 sm:gap-6">
                             <div className="flex flex-col">
                                 <span className="text-[5px] sm:text-[8px] text-zinc-600 font-black uppercase">ROI</span>
-                                <span className={`text-[10px] sm:text-xl font-black font-mono ${roi >= 0 ? 'text-emerald-400' : 'text-red-500'}`}>{roi.toFixed(2)}%</span>
+                                <span className={`text-[10px] sm:text-lg font-black font-mono ${roi >= 0 ? 'text-emerald-400' : 'text-red-500'}`}>{roi.toFixed(2)}%</span>
                             </div>
                             <div className="flex flex-col">
                                 <span className="text-[5px] sm:text-[8px] text-zinc-600 font-black uppercase">Investido</span>
-                                <span className="text-[10px] sm:text-xl font-black text-zinc-300">R${totalInv.toFixed(2)}</span>
+                                <span className="text-[10px] sm:text-lg font-black text-zinc-300">R${totalInv.toFixed(2)}</span>
                             </div>
                         </div>
                     </td>
-                    <td className="px-2 py-3 sm:px-4 sm:py-6 text-right" colSpan={2}>
+                    <td className="px-2 py-3 sm:px-4 sm:py-4 text-right" colSpan={2}>
                       <div className="flex flex-col items-end">
                         <span className="text-[5px] sm:text-[8px] text-zinc-600 font-black uppercase">Mínimo</span>
-                        <div className={`text-base sm:text-3xl font-black ${totalLucro >= 0 ? 'text-emerald-400' : 'text-red-500'}`}>R$ {totalLucro.toFixed(2)}</div>
+                        <div className={`text-base sm:text-2xl font-black ${totalLucro >= 0 ? 'text-emerald-400' : 'text-red-500'}`}>R$ {totalLucro.toFixed(2)}</div>
                       </div>
                     </td>
                   </tr>
