@@ -101,7 +101,14 @@ export default function Operacoes() {
     const tI = novasFases.reduce((s, f) => s + (f.investido || 0), 0);
     const tR = novasFases.reduce((s, f) => s + (f.retorno || 0), 0);
     const tL = novasFases.reduce((s, f) => s + (f.lucro || 0), 0);
-    try { await updateOperacao(opId, { ...op, estrategia: estFinal, fases: novasFases, investido: tI, retorno: tR, lucro: tL }); setIsModalOpen(false); } catch (error) { console.error(error); }
+    try { 
+      await updateOperacao(opId, { ...op, estrategia: estFinal, fases: novasFases, investido: tI, retorno: tR, lucro: tL }); 
+      setIsModalOpen(false); 
+      setFaseParaEditar(null);
+      setFaseIndexEditing(undefined);
+    } catch (error) { 
+      console.error(error); 
+    }
   };
 
   const operacoesFiltradas = useMemo(() => {
@@ -184,8 +191,20 @@ export default function Operacoes() {
             ) : (
               operacoesFiltradas.map(op => (
                   <OperacaoCard key={op.id} operacao={op} onDelete={(id) => deleteOperacao(Number(id))} onEdit={(op) => { setEditingOperacao(op); setIsOperacaoModalOpen(true); }}
-                      onAddQualificacao={(id) => { setCurrentOperacaoId(String(id)); setModalMode('qualificacao'); setIsModalOpen(true); }}
-                      onEditFase={(opId, fase, idx) => { setCurrentOperacaoId(String(opId)); setFaseParaEditar(fase); setFaseIndexEditing(idx); setModalMode(fase.nome.toLowerCase() as any); setIsModalOpen(true); }}
+      onAddQualificacao={(id) => { 
+          setFaseParaEditar(null);
+          setFaseIndexEditing(undefined);
+          setCurrentOperacaoId(String(id)); 
+          setModalMode('qualificacao'); 
+          setIsModalOpen(true); 
+      }}
+      onEditFase={(opId, fase, idx) => { 
+          setCurrentOperacaoId(String(opId)); 
+          setFaseParaEditar(fase); 
+          setFaseIndexEditing(idx); 
+          setModalMode(fase.nome.toLowerCase() as any); 
+          setIsModalOpen(true); 
+      }}
                       onDeleteFase={handleDeleteFase}
                       onUpdateStatus={handleUpdateStatus} onOpenDG={(op) => { setSelectedOpForDG(op); setIsDGModalOpen(true); }}
                   />

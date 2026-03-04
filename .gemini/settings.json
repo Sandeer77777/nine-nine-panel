@@ -72,6 +72,27 @@
         "-y",
         "@modelcontextprotocol/server-lighthouse"
       ]
+    },
+    "github": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ]
+    },
+    "postgres": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres"
+      ]
+    },
+    "perplexity": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-perplexity"
+      ]
     }
   }
 }
